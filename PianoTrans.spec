@@ -10,8 +10,8 @@ import sys
 
 block_cipher = None
 
-# ---- 项目路径 ----
-PROJECT_DIR = os.path.dirname(os.path.abspath(SPECPATH))
+# ---- 项目路径 (当前工作目录) ----
+_PROJECT_DIR = os.getcwd()
 
 # ---- 收集所有 torch 内容 (包括 CUDA DLL) ----
 from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_submodules
@@ -48,6 +48,19 @@ try:
 except Exception:
     sf_datas = []
 
+# customtkinter (暗色/亮色主题 + 组件库)
+try:
+    ctk_datas = collect_data_files('customtkinter')
+    ctk_hidden = collect_submodules('customtkinter')
+except Exception:
+    ctk_datas, ctk_hidden = [], []
+
+# darkdetect (customtkinter 依赖它检测系统主题)
+try:
+    dd_datas = collect_data_files('darkdetect')
+except Exception:
+    dd_datas = []
+
 # ---- 汇编所有数据 ----
 all_datas = (
     librosa_datas +
@@ -56,7 +69,9 @@ all_datas = (
     sf_datas +
     torch_datas +
     tv_datas +
-    ta_datas
+    ta_datas +
+    ctk_datas +
+    dd_datas
 )
 
 # ---- 汇编所有隐藏导入 ----
@@ -66,8 +81,11 @@ hiddenimports = list(set(
     ta_hiddenimports +
     numba_hidden +
     sklearn_hidden +
+    ctk_hidden +
     [
-        # sklearn 特定
+        # customtkinter + 依赖
+        'customtkinter',
+        'darkdetect',
         'sklearn.neighbors._partition_nodes',
         'sklearn.utils._typedefs',
         'sklearn.utils._weight_vector',
@@ -112,15 +130,15 @@ hiddenimports = list(set(
 
 # ---- 开始分析 ----
 a = Analysis(
-    [os.path.join(PROJECT_DIR, 'PianoTrans.py')],
-    pathex=[PROJECT_DIR],
+    [os.path.join(_PROJECT_DIR, 'PianoTrans.py')],
+    pathex=[_PROJECT_DIR],
     binaries=torch_binaries + tv_binaries + ta_binaries,
     datas=all_datas,
     hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[
-        os.path.join(PROJECT_DIR, 'pyi_rth_torch.py'),
+        os.path.join(_PROJECT_DIR, 'pyi_rth_torch.py'),
     ],
     excludes=[
         'tkinter.test',
@@ -150,7 +168,7 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=False,
-    console=True,          # 保留控制台看日志
+    console=False,          # 保留控制台看日志
     icon=None,
 )
 
